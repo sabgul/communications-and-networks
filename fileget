@@ -1,0 +1,28 @@
+#!/usr/bin/python3
+import sys
+
+def checkArguments():
+    if len(sys.argv) != 5:
+        print("error: invalid number of arguments", file=sys.stderr)
+        sys.exit(-1)
+        
+    for i, arg in enumerate(sys.argv):
+        print(f"Argument {i:>6}: {arg} ")
+    return 
+
+if __name__ == "__main__":
+    checkArguments()
+
+
+# symbolicke mena sa prekladaju na IP adresy pomocou protokolu NSP
+# SURL: PROTOCOL://SERVER_NAME/PATH 
+#       protocol - only TCP
+#       server_name - moze byt tvoene len alfanumerickymi znakmi, -, _, a .
+
+# ak subor najdem, ulozim ho do cwd
+# ak nastane chyba, vhodnym sposobom ju vypiseme a ziadny subor nebude vytvoreny
+
+# spustenie: fileget -n NAMESERVER -f SURL
+# -n a -f mozu byt v hocakom poradi
+
+# main.py        
