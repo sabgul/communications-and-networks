@@ -28,24 +28,19 @@ def getArguments():
 
     return True, nameserver, surl
 
-def validSurl(surl):
+
+def processSurl(surl):
     if re.match(r"^(fsp|FSP)://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
-        server = re.sub(r"^(fsp|FSP)://", '', surl)
-        print(server)
-        path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*/", '', server)
-        print(path)
-        server = re.sub(r"/(.)*$", '', server)
-        print(server)
+        temp = re.sub(r"^(fsp|FSP)://", '', surl)
+        path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*/", '', temp)
+        server = re.sub(r"/(.)*$", '', temp)
 
-        return True
+        return True, server, path
     else:
-        return False    
-    return True
-
-    # text_after = re.sub(regex_search_term, regex_replacement, text_before)
+        return False, None, None
 
 
-def checkNameserver(nameserver):
+def processNameserver(nameserver):
     if re.match(r"^([0-9]|[.])*:([0-9])*$", nameserver):
         ip = re.sub(r":([0-9])*$",'',nameserver)
         port = re.sub(r"^([0-9]|[.])*:", '', nameserver)
@@ -67,19 +62,21 @@ def checkNameserver(nameserver):
     else:
         return False, None, None   
 
+
 if __name__ == "__main__":
     validArguments, nameserver, surl = getArguments()
 
     if not validArguments:
         print("error: invalid arguments", file=sys.stderr)
         sys.exit(-1)
+        
     else:
-        # validSurl, server, path = processSurl(surl) 
-        if not validSurl(surl):
+        validSurl, server, path = processSurl(surl) 
+        if not validSurl:
             print("error: invalid surl", file=sys.stderr)
             sys.exit(-1)
 
-        validNameserver, ip, port = checkNameserver(nameserver)
+        validNameserver, ip, port = processNameserver(nameserver)
         if not validNameserver:
             print("error: invalid nameserver", file=sys.stderr)
             sys.exit(-1)
@@ -87,7 +84,7 @@ if __name__ == "__main__":
 # symbolicke mena sa prekladaju na IP adresy pomocou protokolu NSP
 # SURL: PROTOCOL://SERVER_NAME/PATH 
 #       protocol - only TCP
-#       server_name - moze byt tvoene len alfanumerickymi znakmi, -, _, a .
+#       server_name - moze byt tvorene len alfanumerickymi znakmi, -, _, a .
 
 # ak subor najdem, ulozim ho do cwd
 # ak nastane chyba, vhodnym sposobom ju vypiseme a ziadny subor nebude vytvoreny
