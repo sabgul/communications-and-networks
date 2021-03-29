@@ -1,18 +1,88 @@
 #!/usr/bin/python3
 import sys
+import re
+import socket
+import ipaddress
 
-def checkArguments():
+def getArguments():
     if len(sys.argv) != 5:
-        print("error: invalid number of arguments", file=sys.stderr)
-        sys.exit(-1)
-        
-    for i, arg in enumerate(sys.argv):
-        print(f"Argument {i:>6}: {arg} ")
-    return 
+        return False, None, None
+
+    if not '-n' in sys.argv:
+        return False
+    else:
+        index_n =  sys.argv.index('-n')  
+        if index_n == 2 or index_n == 4:
+            return False, None, None
+        else:
+            nameserver = sys.argv[index_n + 1]
+
+    if not '-f' in sys.argv:
+        return False, None, None
+    else:
+        index_f = sys.argv.index('-f')
+        if index_f == 2 or index_f == 4:
+            return False, None, None
+        else:
+            surl = sys.argv[index_f + 1]             
+
+    return True, nameserver, surl
+
+def validSurl(surl):
+    if re.match(r"^(fsp|FSP)://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
+        server = re.sub(r"^(fsp|FSP)://", '', surl)
+        print(server)
+        path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*/", '', server)
+        print(path)
+        server = re.sub(r"/(.)*$", '', server)
+        print(server)
+
+        return True
+    else:
+        return False    
+    return True
+
+    # text_after = re.sub(regex_search_term, regex_replacement, text_before)
+
+
+def checkNameserver(nameserver):
+    if re.match(r"^([0-9]|[.])*:([0-9])*$", nameserver):
+        ip = re.sub(r":([0-9])*$",'',nameserver)
+        port = re.sub(r"^([0-9]|[.])*:", '', nameserver)
+        port = int(port)
+
+        try:
+            ipaddress.ip_address(ip)
+            #socket.inet_aton(ip) # TODO check
+        # except socket.error:
+        #     print('Invalid ip') # TODO vymazat
+        #     return False
+        except:
+            return False, None, None
+
+        if not 0 < port <= 65535:
+            return False, None, None
+
+        return True, ip, port
+    else:
+        return False, None, None   
 
 if __name__ == "__main__":
-    checkArguments()
+    validArguments, nameserver, surl = getArguments()
 
+    if not validArguments:
+        print("error: invalid arguments", file=sys.stderr)
+        sys.exit(-1)
+    else:
+        # validSurl, server, path = processSurl(surl) 
+        if not validSurl(surl):
+            print("error: invalid surl", file=sys.stderr)
+            sys.exit(-1)
+
+        validNameserver, ip, port = checkNameserver(nameserver)
+        if not validNameserver:
+            print("error: invalid nameserver", file=sys.stderr)
+            sys.exit(-1)
 
 # symbolicke mena sa prekladaju na IP adresy pomocou protokolu NSP
 # SURL: PROTOCOL://SERVER_NAME/PATH 
@@ -24,5 +94,4 @@ if __name__ == "__main__":
 
 # spustenie: fileget -n NAMESERVER -f SURL
 # -n a -f mozu byt v hocakom poradi
-
-# main.py        
+     
