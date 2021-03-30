@@ -64,6 +64,32 @@ def processNameserver(nameserver):
     else:
         return False, None, None   
 
+def getRequest(path_surl, filename, createFile):
+    tcpRequest = "GET " + path_surl + " FSP/1.0\r\nAgent: xgulci00\r\n" + "Hostname: " + server_surl + "\r\n\r\n" 
+    tcpRequest = bytes(tcpRequest, 'utf-8')
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcpSocket:
+        tcpSocket.connect((received_ip, received_port))
+        tcpSocket.sendall(tcpRequest)
+        buffer = bytearray()
+        while True:
+            data = tcpSocket.recv(2048)
+            if not data: break
+            buffer.extend(data)
+    
+        tcpSocket.close()
+    # TODO: odchytit hlavicku ci bol subor najdeny (Za FSP/1.0 je success, ak nie tak error)
+
+    buffer = re.sub(b"^(FSP/1.0 Success\r\nLength:([ ]|[0-9]*)\r\n\r\n)", b'', buffer)
+
+    if createFile:
+        file = open(filename, "wb")
+        file.write(buffer)
+        file.close()
+        return None
+    else:
+        return buffer    
+
 
 if __name__ == "__main__":
     validArguments, nameserver, surl = getArguments()
@@ -82,6 +108,18 @@ if __name__ == "__main__":
         if not validNameserver:
             print("error: invalid nameserver", file=sys.stderr)
             sys.exit(-1)
+
+filename = re.sub(r"^(.)*/", '',path_surl)
+if filename == '*':
+    getAll = True
+    getIndex = False
+else:
+    getAll = False
+    getIndex = False
+
+if filename == 'index':
+    path_surl = 'index'
+    getIndex = True
 
 # -------------------------
 # --- UDP communication
@@ -113,27 +151,27 @@ received_port = int(received_port)
 
 # -------------------------
 # --- TCP communication
-tcpRequest = "GET " + path_surl + " FSP/1.0\r\nAgent: xgulci00\r\n" + "Hostname: " + server_surl + "\r\n\r\n" 
-tcpRequest = bytes(tcpRequest, 'utf-8')
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcpSocket:
-    tcpSocket.connect((received_ip, received_port))
-    tcpSocket.sendall(tcpRequest)
-    buffer = bytearray()
-    while True:
-        data = tcpSocket.recv(2048)
-        if not data: break
-        buffer.extend(data)
-   
-    tcpSocket.close()
-# TODO: odchytit hlavicku ci bol subor najdeny (Za FSP/1.0 je success, ak nie tak error)
 
-buffer = re.sub(b"^(FSP/1.0 Success\r\nLength:([ ]|[0-9]*)\r\n\r\n)", b'', buffer)
+if getAll:
+    buff = getRequest('index', None, False)
+    buff = buff.decode("utf-8")
+    files = buff.split('\r\n')
+
+    for file in files:
+        if not '.DS_Store' in file:
+            if file:
+                subFilename = re.sub(r"^(.)*/", '', file)
+                buff = getRequest(file, subFilename, True)
+    # surl = ten prvok listu
+    # filename = musim vyparsovat nove
+    # create file = true
+
+else:
+    buff = getRequest(path_surl, filename, True)    
 
 #vyparsujem si z path meno suboru, a taky isty vytvorim
-filename = re.sub(r"^(.)*/", '',path_surl)
-file = open(filename, "wb")
-file.write(buffer)
-file.close()
+
+    # ak to nie je DS_store, zavolam get na dany file
 
 
 
