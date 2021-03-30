@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# TODO mozno python3.8
 import sys
 import re
 import socket
@@ -30,6 +31,7 @@ def getArguments():
 
 
 def processSurl(surl):
+    # todo: fsp moze byt hocijako aj fSp
     if re.match(r"^(fsp|FSP)://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
         temp = re.sub(r"^(fsp|FSP)://", '', surl)
         path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*/", '', temp)
@@ -69,17 +71,73 @@ if __name__ == "__main__":
     if not validArguments:
         print("error: invalid arguments", file=sys.stderr)
         sys.exit(-1)
-        
+
     else:
-        validSurl, server, path = processSurl(surl) 
+        validSurl, server_surl, path_surl = processSurl(surl) 
         if not validSurl:
             print("error: invalid surl", file=sys.stderr)
             sys.exit(-1)
 
-        validNameserver, ip, port = processNameserver(nameserver)
+        validNameserver, ip_nameserver, port_nameserver = processNameserver(nameserver)
         if not validNameserver:
             print("error: invalid nameserver", file=sys.stderr)
             sys.exit(-1)
+
+# -------------------------
+# --- UDP communication
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+sendstr = "WHEREIS " + server_surl
+sendstr = bytes(sendstr, 'utf-8')
+
+clientSocket.sendto(sendstr, (ip_nameserver, port_nameserver))
+clientSocket.settimeout(5) # TODO raise exception if 5s is exceeded
+received_data, address = clientSocket.recvfrom(1024) # buffer size is 1024bytes
+
+print(received_data)
+# print(address)
+
+#clientSocket.connect()
+#clientSocket.settimeout(30)
+
+# UDP spojenie na nsp, posleme dotaz WHEREIS server, ten mi odpovie OK IP_adresa:port
+# data sa vytvaraju po blokoch (datagramoch)
+# ked chcem nieco poslat, musim datagram vytvorit, pomocou klientskeho soketu poslat na druhu stranu
+# cakam na odpoved
+# na konci zatvorim socket
+# vytvorit socket -> send -> recv -> close
+
+
+# serveru ip_nameserver a port_nameserver sa opytam where_is server_surl
+# ten mi odpovie OK ipadresa:port
+
+# potom tcp spojenim na novu ipadresu:port zavolam index a otvorim jeho obsah
+# pozriem sa ci je v indexe dany subor
+# stihanem dany subor, odstranim hlavicku
+# vytvorim novy subor s rovnakym menom a ulozim do cwd
+
+# ak je tam hviezdicka, musim stiahnut vsetky subory
+
+
+# ./fileget -n 147.229.8.12:3333 -f fsp://foo.bar/file.txt
+# stiahnem subor file.txt zo serveru foo.bar. Pre prklad mena serveru pouzijem nameserver 147.229.8.12
+# pre stiahnutie suboru si najskor stiahnem foo.bar/index kt obsahuje vsetky subory, a tam sa pozriem ci dany subor existuje
+# sprava pride vo viacerych segmentoch, teda dat while nejaky
+# volat kym nepride cely subor
+# pripojim sa na ip za -n, ziskam ip nameserveru, a z danej ip vezmem subor
+
+# data zo suboru nemam citat, ale nechat ich v bajtoch file.write, file otvorti vo wb mode
+
+# zapnutie serveru:
+# hodim sa do os-x zlozky v ipk- servers a spustim:
+# ./fsptest -p 127.0.0.1:3333 -r ../nameserver
+
+# ---- INFO:
+# WHEREIS server.one
+# OK 127.0.0.1:58388
+
+# WHEREIS server.two
+# OK 127.0.0.1:58389
 
 # symbolicke mena sa prekladaju na IP adresy pomocou protokolu NSP
 # SURL: PROTOCOL://SERVER_NAME/PATH 
@@ -91,4 +149,11 @@ if __name__ == "__main__":
 
 # spustenie: fileget -n NAMESERVER -f SURL
 # -n a -f mozu byt v hocakom poradi
-     
+    
+# osetrit? ze * nemoze byt v podzlozke
+# ci nameserver existuje poslem dotaz a dam timeout na odpoved
+# .settimeout a exception na socket.timeout (5 sekund a niekto opakuje kazdy poziadavok 5x keby to bol docasny problem)
+# port mozem otestovat aj tak ze dam try except pri connect
+# index neukladat
+
+# po kazdom get musim odpojit socket, connect a close dat do loopu kde volam get
