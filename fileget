@@ -34,7 +34,7 @@ def processSurl(surl):
     # todo: fsp moze byt hocijako aj fSp
     if re.match(r"^(fsp|FSP)://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
         temp = re.sub(r"^(fsp|FSP)://", '', surl)
-        path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*/", '', temp)
+        path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*", '', temp)
         server = re.sub(r"/(.)*$", '', temp)
 
         return True, server, path
@@ -87,46 +87,61 @@ if __name__ == "__main__":
 # --- UDP communication
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-sendstr = "WHEREIS " + server_surl
-sendstr = bytes(sendstr, 'utf-8')
+udpRequest = "WHEREIS " + server_surl + "\r\n"
+udpRequest = bytes(udpRequest, 'utf-8')
 
-clientSocket.sendto(sendstr, (ip_nameserver, port_nameserver))
-clientSocket.settimeout(5) # TODO raise exception if 5s is exceeded
-received_data, address = clientSocket.recvfrom(1024) # buffer size is 1024bytes
+# try:
+#     clientSocket.settimeout(5)
+#     send("WHERE IS " + server_surl + "\r\n")
+#     received_ip, address = clientSocket.recvfrom(1024) # buffer size is 1024bytes
+# except socket.error:
+#     print("error: invalid connection", file=sys.stderr)
+#     sys.exit(-1)
 
-print(received_data)
-# print(address)
+clientSocket.sendto(udpRequest, (ip_nameserver, port_nameserver))
+clientSocket.settimeout(5) #TODO exeption na timeout
+received_data, address = clientSocket.recvfrom(2048) # buffer size is 1024bytes
+clientSocket.close()
 
-#clientSocket.connect()
-#clientSocket.settimeout(30)
+received_data = received_data.decode("utf-8") 
+received_msg = re.sub(r"([0-9]|[.:])*", '', received_data)
+# TODO process reived msg, if not OK, raise error
+temp = re.sub(r"^([a-zA-Z]|[ ])*",'', received_data)
+received_ip = re.sub(r":([0-9])*$",'', temp)
+received_port = re.sub(r"^([0-9]|[.])*:",'', temp)
+received_port = int(received_port)
 
-# UDP spojenie na nsp, posleme dotaz WHEREIS server, ten mi odpovie OK IP_adresa:port
-# data sa vytvaraju po blokoch (datagramoch)
-# ked chcem nieco poslat, musim datagram vytvorit, pomocou klientskeho soketu poslat na druhu stranu
-# cakam na odpoved
-# na konci zatvorim socket
-# vytvorit socket -> send -> recv -> close
+# -------------------------
+# --- TCP communication
+tcpRequest = "GET " + path_surl + " FSP/1.0\r\nAgent: xgulci00\r\n" + "Hostname: " + server_surl + "\r\n\r\n" 
+tcpRequest = bytes(tcpRequest, 'utf-8')
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as tcpSocket:
+    tcpSocket.connect((received_ip, received_port))
+    tcpSocket.sendall(tcpRequest)
+    buffer = bytearray()
+    while True:
+        data = tcpSocket.recv(2048)
+        if not data: break
+        buffer.extend(data)
+   
+    tcpSocket.close()
+# TODO: odchytit hlavicku ci bol subor najdeny (Za FSP/1.0 je success, ak nie tak error)
+
+buffer = re.sub(b"^(FSP/1.0 Success\r\nLength:([ ]|[0-9]*)\r\n\r\n)", b'', buffer)
+
+#vyparsujem si z path meno suboru, a taky isty vytvorim
+filename = re.sub(r"^(.)*/", '',path_surl)
+file = open(filename, "wb")
+file.write(buffer)
+file.close()
 
 
-# serveru ip_nameserver a port_nameserver sa opytam where_is server_surl
-# ten mi odpovie OK ipadresa:port
 
-# potom tcp spojenim na novu ipadresu:port zavolam index a otvorim jeho obsah
-# pozriem sa ci je v indexe dany subor
-# stihanem dany subor, odstranim hlavicku
-# vytvorim novy subor s rovnakym menom a ulozim do cwd
 
 # ak je tam hviezdicka, musim stiahnut vsetky subory
 
 
 # ./fileget -n 147.229.8.12:3333 -f fsp://foo.bar/file.txt
-# stiahnem subor file.txt zo serveru foo.bar. Pre prklad mena serveru pouzijem nameserver 147.229.8.12
-# pre stiahnutie suboru si najskor stiahnem foo.bar/index kt obsahuje vsetky subory, a tam sa pozriem ci dany subor existuje
-# sprava pride vo viacerych segmentoch, teda dat while nejaky
-# volat kym nepride cely subor
-# pripojim sa na ip za -n, ziskam ip nameserveru, a z danej ip vezmem subor
-
-# data zo suboru nemam citat, ale nechat ich v bajtoch file.write, file otvorti vo wb mode
 
 # zapnutie serveru:
 # hodim sa do os-x zlozky v ipk- servers a spustim:
