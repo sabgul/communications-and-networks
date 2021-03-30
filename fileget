@@ -32,9 +32,13 @@ def getArguments():
 
 # Checks validity of surl
 def processSurl(surl):
-    # TODO prerobit tuto prasacinu
-    if re.match(r"^(fsp|FSP|fSP|FsP|FSp|Fsp|fSp|fsP)://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
-        temp = re.sub(r"^(fsp|FSP)://", '', surl)
+    protocol = surl[:3]
+    protocol = protocol.lower()
+    if protocol != 'fsp':
+        return False, None, None
+
+    if re.match(r"^(.){3}://([a-zA-Z]|[0-9]|[-_.])*/(.)*$", surl):
+        temp = re.sub(r"^(.){3}://", '', surl)
         path = re.sub(r"^([a-zA-Z]|[0-9]|[-_.])*", '', temp)
         server = re.sub(r"/(.)*$", '', temp)
         return True, server, path
@@ -92,7 +96,7 @@ def getRequest(path_surl, filename, createFile):
     compare = int(compare)
     length = int(len(buffer))
     if compare != length:
-        print("error: whole file was not loaded", file=sys.stderr)
+        print("error: entire file was not loaded", file=sys.stderr)
         sys.exit(-1)
 
     if createFile:
@@ -145,7 +149,7 @@ try:
     received_data, address = clientSocket.recvfrom(2048)
     clientSocket.close()
 except:
-    print("error: connection timeout", file=sys.stderr)
+    print("error: connection failed", file=sys.stderr)
     sys.exit(-1)
 
 messageCheck = received_data.decode("utf-8")
@@ -181,7 +185,3 @@ else:
         sys.exit(-1)
     else:
         buff = getRequest(path_surl, filename, True)      
-
-# TODO precitat zadanie a zistit ako vypisovat chyby
-# TODO prejst si vsetky mozne exceptions
-# TODO co ked stahujem z podzlozky
