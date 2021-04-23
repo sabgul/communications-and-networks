@@ -69,6 +69,7 @@ int main(int argc, char **argv) {
             i++;
             if(i >= argc) { fprintf(stderr, "error: invalid arguments were entered\n"); return ARG_ERROR; }
             port = atoi(argv[i]);
+            // TODO check ci ide o valid port
         } else if (strcmp(argv[i], "-n") == 0) {
             numSpec = true;
             i++;
