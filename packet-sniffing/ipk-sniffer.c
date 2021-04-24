@@ -11,6 +11,12 @@
 
 // program by sa mal dat kedykolvek ukoncit pomocou ctrl+c
 // TODO mozno povolit kombinovanie filtrov, to dorobim ak ostane cas, inak dovolujem len jeden
+
+/* 
+    Function lists all available interfaces if -i option was used with no 
+    specific value, or if it wasn't used at all, and terminates the script
+    with respective error code. 
+*/
 int listInterfaces() {
     char errorBuffer[PCAP_ERRBUF_SIZE];
     pcap_if_t *interfaceList;
@@ -36,6 +42,38 @@ int listInterfaces() {
     return SUCCESS;
 }
 
+/*
+    The core function of this program. Behaves according to the specified flags and set values.
+    It processes obtained data. //TODO ked budem vediet co vlastne robim 
+*/
+int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool udpSpec, bool arpSpec, bool icmpSpec, int numOfPackets) {
+    /* Goes through the list of interfaces and checks whether existing interface is to be sniffed */
+    char errorBuffer[PCAP_ERRBUF_SIZE];
+    pcap_if_t *interfaceList;
+    
+    int findInterfacesCheck = pcap_findalldevs(&interfaceList, errorBuffer);
+    if (findInterfacesCheck != 0) {
+        fprintf(stderr, "error: findalldevs failed\n");
+        return FINDALLDEVS_ERR;
+    }
+
+    pcap_if_t *iElement = interfaceList;
+    bool validInterface = false;
+    while(iElement != NULL) {
+        if(strcmp(iElement->name, interface) == 0) { validInterface = true; break;}
+        iElement = iElement->next;
+    } 
+
+    if(!validInterface) {
+        fprintf(stderr, "error: invalid / inactive interface was specified\n");
+        return ARG_ERROR;
+    }
+    /* ------ */
+
+
+
+    return SUCCESS;
+}
 
 int main(int argc, char **argv) {
     /* Flags specify whether given argument was entered / specified, or not */
@@ -137,6 +175,7 @@ int main(int argc, char **argv) {
         return listInterfaces();
     } else {
         // tuto budeme snifovac
+        return packetSniffing(interface, portSpec, port, tcpSpec, udpSpec, arpSpec, icmpSpec, numOfPackets);
     }
     // TODO skontrolovat ci je zadany interface v liste vstekych rozhrani
     // set up sniffing 
