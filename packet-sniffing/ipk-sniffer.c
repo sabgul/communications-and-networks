@@ -19,8 +19,11 @@
 // This appears in the Ethernet frame header when the payload is an ARP packet and is not to be confused with PTYPE, 
 // which appears within this encapsulated ARP packet.
 
-// TODO mozno povolit kombinovanie filtrov, to dorobim ak ostane cas, inak dovolujem len jeden
-
+// TODO DOKU mozno povolit kombinovanie filtrov, to dorobim ak ostane cas, inak dovolujem len jeden
+/*
+    Function displays brief description of this application.
+    It is executed when -h or --help command line argument was used.
+*/
 void displayHelp() {
     fprintf(stdout, "\n---------------------- GUIDE - PACKET SNIFFER ----------------------\n"
                     "DESCRIPTION: \n"
@@ -86,7 +89,29 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
     char portS[6];
     sprintf(portS, "%d", port);
 
-    if (tcpFlag) {
+    if (tcpFlag && udpFlag) {
+        strcat(captureFilter, "tcp and udp");
+    } else if (tcpFlag && arpFlag) {
+        strcat(captureFilter, "tcp and arp");
+    } else if (tcpFlag && icmpFlag) {
+        strcat(captureFilter, "tcp and icmp");
+    } else if (udpFlag && arpFlag) {
+        strcat(captureFilter, "udp and arp");
+    } else if (udpFlag && icmpFlag) {
+        strcat(captureFilter, "udp and icmp");
+    } else if (arpFlag && icmpFlag) {
+        strcat(captureFilter, "arp and icmp");
+    } else if (tcpFlag && udpFlag && arpFlag) {
+        strcat(captureFilter, "tcp and udp and arp");
+    } else if (tcpFlag && arpFlag && icmpFlag) {
+        strcat(captureFilter, "tcp and arp and icmp");
+    } else if (tcpFlag && udpFlag && icmpFlag) {
+        strcat(captureFilter, "tcp and udp and icmp");
+    } else if (udpFlag && arpFlag && icmpFlag) {
+        strcat(captureFilter, "udp and arp and icmp");
+    } else if (tcpFlag && udpFlag && arpFlag && icmpFlag) {
+        strcat(captureFilter, "tcp and udp and arp and icmp");
+    } else if (tcpFlag) {
         strcat(captureFilter, "tcp");
     } else if (udpFlag) {
         strcat(captureFilter, "udp");
@@ -99,10 +124,13 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
     if (portFlag && !(tcpFlag || udpFlag || arpFlag || icmpFlag)) {
         strcat(captureFilter, "port ");
         strcat(captureFilter, portS);
+    } else if(portFlag && (arpFlag || icmpFlag)) {
+        strcat(captureFilter, " or port ");
+        strcat(captureFilter, portS);
     } else if (portFlag) {
         strcat(captureFilter, " and port ");
         strcat(captureFilter, portS);
-    }
+    } 
     // printf(">>>>%s\n", captureFilter);
     return NULL;
 }
@@ -111,7 +139,7 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
     The arguments of this function are defined by the required structure of the callback 
     function in the pcap_loop.
     Function processes each captured packet and decides about the captured data's postprocessing
-    into desired output form.
+    into the desired output form.
 */
 void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
     /*  As defined in pcap.h
@@ -121,8 +149,10 @@ void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_ch
             bpf_u_int32 len; -- length this packet (off wire) 
         };      
     */
-   fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %d\n", header->len);
-   fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %s\n", args);
+//    struct sniffedTime{} = packet.ts;
+
+//    fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %d\n", header->len);
+//    fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %s\n", args);
 }
 
 
@@ -195,6 +225,7 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
     }
 
     /* starting the sniffing of interface and processing the sniffed packets */
+
     pcap_loop(packetCaptureHandle, numOfPackets, packetProcessing, NULL);
     pcap_close(packetCaptureHandle);
     /* ------ */
@@ -273,28 +304,12 @@ int main(int argc, char **argv) {
             }
             numOfPackets = atoi(argv[i]);
         } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--tcp") == 0) {
-            if (udpSpec || arpSpec || icmpSpec) {
-                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
-                return ARG_ERROR;
-            }
             tcpSpec = true;
         } else if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--udp") == 0) {
-            if (tcpSpec || arpSpec || icmpSpec) {
-                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
-                return ARG_ERROR;
-            }
             udpSpec = true;
         } else if (strcmp(argv[i], "--arp") == 0) {
-            if (tcpSpec || udpSpec || icmpSpec) {
-                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
-                return ARG_ERROR;
-            }
             arpSpec = true;
         } else if (strcmp(argv[i], "--icmp") == 0) {
-            if (tcpSpec || udpSpec || arpSpec) {
-                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
-                return ARG_ERROR;
-            }
             icmpSpec = true;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             displayHelp();
@@ -306,11 +321,9 @@ int main(int argc, char **argv) {
     }
     /*-------------------------------------------------------------------------------------*/
     
-    // get available devices
     if (interfaceSet == false || interfaceSpec == false) {
         return listInterfaces();
     } else {
-        // tuto budeme snifovac
         return packetSniffing(interface, portSpec, port, tcpSpec, udpSpec, arpSpec, icmpSpec, numOfPackets);
     }
 
