@@ -12,9 +12,38 @@
 #define FILTER_ERR 5
 #define INTERNAL_ERR 99
 
-// program by sa mal dat kedykolvek ukoncit pomocou ctrl+c
-// TODO ked mi teda niekto nezada -n, mam vypisat 1 packet, ci vsetky kym nepride ctrl+c?
+#define TCP_PROTOCOL 6
+#define UDP_PROTOCOL 17
+#define ICMP_PROTOCOL 1
+// arp: The EtherType for ARP is 0x0806. 
+// This appears in the Ethernet frame header when the payload is an ARP packet and is not to be confused with PTYPE, 
+// which appears within this encapsulated ARP packet.
+
 // TODO mozno povolit kombinovanie filtrov, to dorobim ak ostane cas, inak dovolujem len jeden
+
+void displayHelp() {
+    fprintf(stdout, "\n---------------------- GUIDE - PACKET SNIFFER ----------------------\n"
+                    "DESCRIPTION: \n"
+                    "   Application ipk-sniffer serves as a packet sniffer which \n"
+                    "   is a tool used to monitor the network traffic. \n"
+                    "   This application is capable of capturing and filtering of packets\n"
+                    "   according to the behaviour specified by command line arguments.\n\n"
+                    "ACCEPTED PARAMETERS: \n"
+                    "   -h | --help      - displays this guide\n"
+                    "   -i | --interface - specifies the interface for sniffing\n"
+                    "   -p               - only capturing packets on specified port\n"
+                    "   -t | --tcp       - only displaying TCP packets \n" 
+                    "   -u | --udp       - only displaying UDP packets \n"
+                    "   -n               - number of packets to be sniffed\n\n"
+                    "ERROR CODES: \n"
+                    "   1                - invalid arguments\n"
+                    "   2                - error listing all active interfaces\n"
+                    "   3                - error in lookup \n"
+                    "   4                - pcap error opening the interface \n"
+                    "   5                - error compiling or applying filter\n"
+                    "   99               - internal error - allocation failed etc.\n"
+                    "--------------------------------------------------------------------\n\n");
+}
 
 /* 
     Function lists all available interfaces if -i option was used with no 
@@ -67,8 +96,6 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
         strcat(captureFilter, "icmp");
     }
 
-
-
     if (portFlag && !(tcpFlag || udpFlag || arpFlag || icmpFlag)) {
         strcat(captureFilter, "port ");
         strcat(captureFilter, portS);
@@ -80,10 +107,22 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
     return NULL;
 }
 
-/* The arguments of this function are defined by the required structure of the callback 
-    function in the pcap_loop */
+/*  
+    The arguments of this function are defined by the required structure of the callback 
+    function in the pcap_loop.
+    Function processes each captured packet and decides about the captured data's postprocessing
+    into desired output form.
+*/
 void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
-
+    /*  As defined in pcap.h
+        struct pcap_pkthdr {
+            struct timeval ts; -- time stamp
+            bpf_u_int32 caplen; -- length of portion present 
+            bpf_u_int32 len; -- length this packet (off wire) 
+        };      
+    */
+   fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %d\n", header->len);
+   fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %s\n", args);
 }
 
 
@@ -98,7 +137,7 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
     
     int findInterfacesCheck = pcap_findalldevs(&interfaceList, errorBuffer);
     if (findInterfacesCheck != 0) {
-        fprintf(stderr, "error: findalldevs failed\n");
+        fprintf(stderr, "error: findalldevs failed: %s\n", errorBuffer);
         return FINDALLDEVS_ERR;
     }
 
@@ -133,17 +172,16 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
 
     /* selecting an interface for sniffing data
             1 - interface is to be put into promiscuous mode
-            10000 - packet buffer timeout in miliseconds */
-    pcap_t *packetCaptureHandle = pcap_open_live(interface, BUFSIZ, 1, 10000, errorBuffer);
+            1000 - packet buffer timeout in miliseconds */
+    pcap_t *packetCaptureHandle = pcap_open_live(interface, BUFSIZ, 1, 1000, errorBuffer);
     if(packetCaptureHandle == NULL) {
-        fprintf(stderr, "error: cannot open the interface %s\n", interface);
+        fprintf(stderr, "error: cannot open the interface %s: %s\n", interface, errorBuffer);
         return PCAPOPEN_ERR;
     }
 
     /*  Creates and applies capture filter according to the specified flags.
         Therefore only packets compliant with the specified parameters 
         will be captured and later displayed  */
-
     char *captureFilter = getCaptureFilter(portSpec, port, tcpSpec, udpSpec, arpSpec, icmpSpec);
     if (pcap_compile(packetCaptureHandle, &fp, captureFilter, 0, interfaceIp) == -1) {
         fprintf(stderr, "error: compilation of filter failed\n");
@@ -258,6 +296,9 @@ int main(int argc, char **argv) {
                 return ARG_ERROR;
             }
             icmpSpec = true;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            displayHelp();
+            return SUCCESS;
         } else {
             fprintf(stderr, "error: invalid arguments were entered\n");
             return ARG_ERROR;
