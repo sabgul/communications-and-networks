@@ -53,10 +53,9 @@ int listInterfaces() {
     which described the valid syntax of capture filter. Wireshark - like this sniffer -
     is based on the libcap library, therefore the syntax is equivalent */ // TODO toto to dokumentacie skor ako tu
 char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool arpFlag, bool icmpFlag) {
-    char captureFilter[50];
+    char captureFilter[50] = "\0";
     char portS[6];
     sprintf(portS, "%d", port);
-
 
     if (tcpFlag) {
         strcat(captureFilter, "tcp");
@@ -68,14 +67,16 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
         strcat(captureFilter, "icmp");
     }
 
+
+
     if (portFlag && !(tcpFlag || udpFlag || arpFlag || icmpFlag)) {
         strcat(captureFilter, "port ");
         strcat(captureFilter, portS);
     } else if (portFlag) {
-        strcat(captureFilter, "and port ");
+        strcat(captureFilter, " and port ");
         strcat(captureFilter, portS);
     }
-
+    // printf(">>>>%s\n", captureFilter);
     return NULL;
 }
 
@@ -83,7 +84,6 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
     function in the pcap_loop */
 void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
 
-    
 }
 
 
@@ -211,7 +211,12 @@ int main(int argc, char **argv) {
                     strcmp(argv[i], "--arp") == 0 || strcmp(argv[i], "--icmp") == 0) { 
                 fprintf(stderr, "error: -p option was used but not specified\n"); return ARG_ERROR; 
             }
+
             port = atoi(argv[i]);
+            if(strcmp(argv[i], "0") != 0 && port == 0) {
+                fprintf(stderr, "error: invalid port\n");
+                return ARG_ERROR;
+            }
 
             if (port < 0 || port > 65635) {
                 fprintf(stderr, "error: invalid port\n");
