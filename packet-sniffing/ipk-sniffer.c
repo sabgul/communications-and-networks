@@ -8,16 +8,16 @@
 #define INTERNAL_ERR 99
 
 // program by sa mal dat kedykolvek ukoncit pomocou ctrl+c
-
+// TODO mozno povolit kombinovanie filtrov, to dorobim ak ostane cas, inak dovolujem len jeden
 int main(int argc, char **argv) {
     /* Flags specify whether given argument was entered / specified, or not */
     bool interfaceSet = false; /* defines, whether -i option was used */
     bool interfaceSpec = false; /* defines, whether interface was specified */
     bool portSpec = false; /* defines, whether -p option was used an parameter specified */
-    bool tcpSpec = false;
-    bool udpSpec = false;
-    bool arpSpec = false;
-    bool icmpSpec = false;
+    bool tcpSpec = false; /* lists only tcp packets */
+    bool udpSpec = false; /* lists only udp packets */
+    bool arpSpec = false; /* lists only arp frames */
+    bool icmpSpec = false; /* lists only ICMPv4 and ICMPv6 packets */
     bool numSpec = false; 
     int numOfPackets = -1;
     int port = -1;
@@ -68,12 +68,28 @@ int main(int argc, char **argv) {
             }
             numOfPackets = atoi(argv[i]);
         } else if (strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--tcp") == 0) {
+            if (udpSpec || arpSpec || icmpSpec) {
+                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
+                return ARG_ERROR;
+            }
             tcpSpec = true;
         } else if (strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--udp") == 0) {
+            if (tcpSpec || arpSpec || icmpSpec) {
+                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
+                return ARG_ERROR;
+            }
             udpSpec = true;
         } else if (strcmp(argv[i], "--arp") == 0) {
+            if (tcpSpec || udpSpec || icmpSpec) {
+                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
+                return ARG_ERROR;
+            }
             arpSpec = true;
         } else if (strcmp(argv[i], "--icmp") == 0) {
+            if (tcpSpec || udpSpec || arpSpec) {
+                fprintf(stderr, "error: two filters for packets were used, choose only one\n");
+                return ARG_ERROR;
+            }
             icmpSpec = true;
         } else {
             fprintf(stderr, "error: invalid arguments were entered\n");
