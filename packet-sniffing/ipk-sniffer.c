@@ -7,7 +7,9 @@
 #define SUCCESS 0
 #define ARG_ERROR 1
 #define FINDALLDEVS_ERR 2
-#define PCAPOPEN_ERR 3
+#define LOOKUP_ERR 3
+#define PCAPOPEN_ERR 4
+#define FILTER_ERR 5
 #define INTERNAL_ERR 99
 
 // program by sa mal dat kedykolvek ukoncit pomocou ctrl+c
@@ -89,8 +91,18 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
     /*  
         Following snippet of code is based on the article // TODO
         @see: https://www.binarytides.com/packet-sniffer-code-c-libpcap-linux-sockets/
+        For the applying of filter:
         @see: https://www.tcpdump.org/pcap.html
     */
+
+    struct bpf_program fp;		/* will contain the compiled filter expression */
+    bpf_u_int32 interfaceIp;
+    bpf_u_int32 interfaceMask;
+
+    if (pcap_lookupnet(interface, &interfaceIp, &interfaceMask, errorBuffer) == -1) {
+        fprintf(stderr, "error: could not get netmask for interface %s\n", interface);
+        return LOOKUP_ERR;
+    }
 
     /* selecting an interface for sniffing data
             1 - interface is to be put into promiscuous mode
@@ -101,12 +113,21 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
         return PCAPOPEN_ERR;
     }
 
-    /*  Creates capture filter according to the specified flags.
+    /*  Creates and applies capture filter according to the specified flags.
         Therefore only packets compliant with the specified parameters 
         will be captured and later displayed  */
+
     char *captureFilter = getCaptureFilter(portSpec, port, tcpSpec, udpSpec, arpSpec, icmpSpec);
-    
+    if (pcap_compile(packetCaptureHandle, &fp, captureFilter, 0, interfaceIp) == -1) {
+        fprintf(stderr, "error: compilation of filter failed\n");
+        return FILTER_ERR;
+    }
+
     /* Application of the capture filter */
+    if (pcap_setfilter(packetCaptureHandle, &fp) == -1) {
+        fprintf(stderr, "error: application of filter failed\n");
+        return FILTER_ERR;
+    }
 
     /* starting the sniffing of interface and processing the sniffed packets */
     pcap_loop(packetCaptureHandle, numOfPackets, packetProcessing, NULL);
