@@ -52,12 +52,39 @@ int listInterfaces() {
     https://www.wireshark.org/docs/wsug_html_chunked/ChCapCaptureFilterSection.html
     which described the valid syntax of capture filter. Wireshark - like this sniffer -
     is based on the libcap library, therefore the syntax is equivalent */ // TODO toto to dokumentacie skor ako tu
-char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool arpSpec, bool icmpSpec) {
+char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool arpFlag, bool icmpFlag) {
+    char captureFilter[50];
+    char portS[6];
+    sprintf(portS, "%d", port);
+
+
+    if (tcpFlag) {
+        strcat(captureFilter, "tcp");
+    } else if (udpFlag) {
+        strcat(captureFilter, "udp");
+    } else if (arpFlag) {
+        strcat(captureFilter, "arp");   
+    } else if (icmpFlag) {
+        strcat(captureFilter, "icmp");
+    }
+
+    if (portFlag && !(tcpFlag || udpFlag || arpFlag || icmpFlag)) {
+        strcat(captureFilter, "port ");
+        strcat(captureFilter, portS);
+    } else if (portFlag) {
+        strcat(captureFilter, "and port ");
+        strcat(captureFilter, portS);
+    }
+
     return NULL;
 }
 
+/* The arguments of this function are defined by the required structure of the callback 
+    function in the pcap_loop */
+void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_char *packet) {
 
-void packetProcessing() {}
+    
+}
 
 
 /*
