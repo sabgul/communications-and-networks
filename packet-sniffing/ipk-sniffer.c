@@ -3,7 +3,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <pcap.h>
-
+#include <net/ethernet.h>
+#include <netinet/ip.h>
+#include <ctype.h>
 #define SUCCESS 0
 #define ARG_ERROR 1
 #define FINDALLDEVS_ERR 2
@@ -85,32 +87,32 @@ int listInterfaces() {
     which described the valid syntax of capture filter. Wireshark - like this sniffer -
     is based on the libcap library, therefore the syntax is equivalent */ // TODO toto to dokumentacie skor ako tu
 char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool arpFlag, bool icmpFlag) {
-    char captureFilter[50] = "\0";
+    static char captureFilter[50] = "\0";
     char portS[6];
     sprintf(portS, "%d", port);
 
     if (tcpFlag && udpFlag) {
-        strcat(captureFilter, "tcp and udp");
+        strcat(captureFilter, "tcp or udp");
     } else if (tcpFlag && arpFlag) {
-        strcat(captureFilter, "tcp and arp");
+        strcat(captureFilter, "tcp or arp");
     } else if (tcpFlag && icmpFlag) {
-        strcat(captureFilter, "tcp and icmp");
+        strcat(captureFilter, "tcp or icmp");
     } else if (udpFlag && arpFlag) {
-        strcat(captureFilter, "udp and arp");
+        strcat(captureFilter, "udp or arp");
     } else if (udpFlag && icmpFlag) {
-        strcat(captureFilter, "udp and icmp");
+        strcat(captureFilter, "udp or icmp");
     } else if (arpFlag && icmpFlag) {
-        strcat(captureFilter, "arp and icmp");
+        strcat(captureFilter, "arp or icmp");
     } else if (tcpFlag && udpFlag && arpFlag) {
-        strcat(captureFilter, "tcp and udp and arp");
+        strcat(captureFilter, "tcp or udp or arp");
     } else if (tcpFlag && arpFlag && icmpFlag) {
-        strcat(captureFilter, "tcp and arp and icmp");
+        strcat(captureFilter, "tcp or arp or icmp");
     } else if (tcpFlag && udpFlag && icmpFlag) {
-        strcat(captureFilter, "tcp and udp and icmp");
+        strcat(captureFilter, "tcp or udp or icmp");
     } else if (udpFlag && arpFlag && icmpFlag) {
-        strcat(captureFilter, "udp and arp and icmp");
+        strcat(captureFilter, "udp or arp or icmp");
     } else if (tcpFlag && udpFlag && arpFlag && icmpFlag) {
-        strcat(captureFilter, "tcp and udp and arp and icmp");
+        strcat(captureFilter, "tcp or udp or arp or icmp");
     } else if (tcpFlag) {
         strcat(captureFilter, "tcp");
     } else if (udpFlag) {
@@ -131,9 +133,9 @@ char* getCaptureFilter(bool portFlag, int port, bool tcpFlag, bool udpFlag, bool
         strcat(captureFilter, " and port ");
         strcat(captureFilter, portS);
     } 
-    // printf(">>>>%s\n", captureFilter);
-    return NULL;
+    return captureFilter;
 }
+
 
 /*  
     The arguments of this function are defined by the required structure of the callback 
@@ -149,10 +151,155 @@ void packetProcessing(u_char *args, const struct pcap_pkthdr *header, const u_ch
             bpf_u_int32 len; -- length this packet (off wire) 
         };      
     */
-//    struct sniffedTime{} = packet.ts;
+    //struct sniffedTime{} = packet.ts;
+    struct ether_header *eth_header;
+    eth_header = (struct ether_header *) packet;
+    /* The total packet length, including all headers
+       and the data payload is stored in
+       header->len and header->caplen. Caplen is
+       the amount actually available, and len is the
+       total packet length even if it is larger
+       than what we currently have captured. If the snapshot
+       length set with pcap_open_live() is too small, you may
+       not have the whole packet. */
+    // printf("Total packet available: %d bytes\n", header->caplen);
+    // printf("Expected packet size: %d bytes\n", header->len);
 
-//    fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %d\n", header->len);
-//    fprintf(stdout, "Hell yeah I sure am sniffin, this is the size: %s\n", args);
+    /* Pointers to start point of various headers */
+    const u_char *ip_header;
+    const u_char *tcp_header;
+    const u_char *payload;
+
+    /* Header lengths in bytes */
+    int ethernet_header_length = 14; /* Doesn't change */
+    int ip_header_length;
+    int tcp_header_length;
+    int payload_length;
+
+    /* Find start of IP header */
+    ip_header = packet + ethernet_header_length;
+    /* The second-half of the first byte in ip_header
+       contains the IP header length (IHL). */
+    ip_header_length = ((*ip_header) & 0x0F);
+    /* The IHL is number of 32-bit segments. Multiply
+       by four to get a byte count for pointer arithmetic */
+    ip_header_length = ip_header_length * 4;
+    // printf("IP header length (IHL) in bytes: %d\n", ip_header_length);
+
+    /* Now that we know where the IP header is, we can 
+       inspect the IP header for a protocol number to 
+       make sure it is TCP before going any further. 
+       Protocol is always the 10th byte of the IP header */
+    u_char protocol = *(ip_header + 9);
+
+    if (protocol == IPPROTO_ICMP) {
+        // sniff icmp 
+        printf(" >> ICMP CAU \n");
+    } 
+
+    if (protocol == IPPROTO_ICMPV6) {
+        printf(" >> ICMPv6 CAU \n");
+    } 
+
+    if (protocol == IPPROTO_UDP) {
+        printf(" >> UDP CAU \n");
+    } 
+
+    if (protocol == IPPROTO_TCP) {
+        printf(" >> TCP CAU \n");
+        tcp_header = packet + ethernet_header_length + ip_header_length;
+        tcp_header_length = ((*(tcp_header + 12)) & 0xF0) >> 4;
+        tcp_header_length = tcp_header_length * 4;
+        int total_headers_size = ethernet_header_length+ip_header_length+tcp_header_length;
+        payload_length = header->caplen - (ethernet_header_length + ip_header_length + tcp_header_length);
+        payload = packet + total_headers_size;
+        if (payload_length > 0) {
+            const u_char *temp_pointer = payload;
+            int byte_count = 0;
+            char asciiDisplay[17] = "\0";
+            int enoguhHex = 0;
+            int disp = 0;
+            printf("0x%04x: ", disp);
+            while (byte_count++ < payload_length) {
+                char hexData [3];
+                sprintf(hexData,"%02x", *temp_pointer);
+                enoguhHex++;
+                char cosi = *temp_pointer;
+                if(isprint(cosi)) {
+                    // fprintf(stdout,"\nTu som.\n");
+                    strncat(asciiDisplay, &cosi,1);
+                    // if (enoguhHex == 6){
+                    //     strcat(asciiDisplay, " ");
+                    // }
+                } else {
+                    // fprintf(stdout,"\nTu som..\n");
+                    strncat(asciiDisplay, ".",1);
+                }
+                
+                if ((enoguhHex >= 1 && enoguhHex < 8) || (enoguhHex > 8 && enoguhHex < 16)) {
+                    fprintf(stdout, "%s ", hexData);
+                } else if (enoguhHex == 8) {
+                    fprintf(stdout, "%s  ", hexData);
+                } else if (enoguhHex == 16) {
+                    disp += 16;
+                    fprintf(stdout, "%s  ", hexData);
+                    fprintf(stdout, "%s\n0x%04x: ", asciiDisplay, disp);
+                    strcpy(asciiDisplay, "");
+                } else {
+                    enoguhHex = 0;
+                }
+
+
+
+                temp_pointer++;
+            }
+            printf("\n");
+        }
+    }
+
+    // /* Add the ethernet and ip header length to the start of the packet
+    //    to find the beginning of the TCP header */
+    // tcp_header = packet + ethernet_header_length + ip_header_length;
+    // /* TCP header length is stored in the first half 
+    //    of the 12th byte in the TCP header. Because we only want
+    //    the value of the top half of the byte, we have to shift it
+    //    down to the bottom half otherwise it is using the most 
+    //    significant bits instead of the least significant bits */
+    // tcp_header_length = ((*(tcp_header + 12)) & 0xF0) >> 4;
+    // /* The TCP header length stored in those 4 bits represents
+    //    how many 32-bit words there are in the header, just like
+    //    the IP header length. We multiply by four again to get a
+    //    byte count. */
+    // tcp_header_length = tcp_header_length * 4;
+    // printf("TCP header length in bytes: %d\n", tcp_header_length);
+
+    // /* Add up all the header sizes to find the payload offset */
+    // int total_headers_size = ethernet_header_length+ip_header_length+tcp_header_length;
+    // printf("Size of all headers combined: %d bytes\n", total_headers_size);
+    // payload_length = header->caplen -
+    //     (ethernet_header_length + ip_header_length + tcp_header_length);
+    // printf("Payload size: %d bytes\n", payload_length);
+    // payload = packet + total_headers_size;
+    // printf("Memory address where payload begins: %s\n\n", payload);
+
+    // /* Print payload in ASCII */
+      
+    // if (payload_length > 0) {
+    //     const u_char *temp_pointer = payload;
+    //     int byte_count = 0;
+    //     while (byte_count++ < payload_length) {
+    //         if(isprint(*temp_pointer)) {
+    //             printf("%c", *temp_pointer);
+    //         } else {
+    //             printf(".");
+    //         }
+            
+    //         temp_pointer++;
+    //     }
+    //     printf("\n");
+    // }
+    
+
 }
 
 
@@ -195,11 +342,6 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
     bpf_u_int32 interfaceIp;
     bpf_u_int32 interfaceMask;
 
-    if (pcap_lookupnet(interface, &interfaceIp, &interfaceMask, errorBuffer) == -1) {
-        fprintf(stderr, "error: could not get netmask for interface %s\n", interface);
-        return LOOKUP_ERR;
-    }
-
     /* selecting an interface for sniffing data
             1 - interface is to be put into promiscuous mode
             1000 - packet buffer timeout in miliseconds */
@@ -207,6 +349,11 @@ int packetSniffing(char *interface, bool portSpec, int port, bool tcpSpec, bool 
     if(packetCaptureHandle == NULL) {
         fprintf(stderr, "error: cannot open the interface %s: %s\n", interface, errorBuffer);
         return PCAPOPEN_ERR;
+    }
+
+    if (pcap_lookupnet(interface, &interfaceIp, &interfaceMask, errorBuffer) == -1) {
+        fprintf(stderr, "error: could not get netmask for interface %s\n", interface);
+        return LOOKUP_ERR;
     }
 
     /*  Creates and applies capture filter according to the specified flags.
